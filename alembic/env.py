@@ -3,6 +3,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from app import models  # noqa: F401  (ensures Base.metadata is populated)
 from app.database import Base, SQLALCHEMY_DATABASE_URL
 
 # this is the Alembic Config object, which provides
