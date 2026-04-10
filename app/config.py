@@ -7,12 +7,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    database_hostname: str
-    database_password: str
-    database_name: str
+    # Prefer DATABASE_URL in hosted environments (Render, Railway, etc.).
+    database_url: Optional[str] = None
+
+    # Fallback split DB settings for local/dev usage.
+    database_hostname: Optional[str] = None
+    database_password: Optional[str] = None
+    database_name: Optional[str] = None
     secret_key: str
-    database_port: str
-    database_username: str
+    database_port: Optional[str] = None
+    database_username: Optional[str] = None
     algorithm: str
     access_token_expire_minutes: int
 
