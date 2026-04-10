@@ -1,18 +1,33 @@
-#  FastAPI Management System
+# 📣 FastAPI Social Platform
 
-A robust and scalable **management system** built with **FastAPI** and powered by **PostgreSQL**. This project demonstrates modern backend development practices, with full support for **Docker** to ensure seamless deployment across environments.
+A robust and scalable **social platform** built with **FastAPI** and powered by **PostgreSQL**, where users can **share content** and **vote** on posts. This project demonstrates modern backend development practices, with full support for **Docker** to ensure seamless deployment across environments.
 
 ---
 
-##  Features
+## Features
 
--  **FastAPI Framework** – High-performance Python web framework with automatic OpenAPI docs and blazing-fast async support.
+- **FastAPI Framework** – High-performance Python web framework with automatic OpenAPI docs and blazing-fast async support.
 - **PostgreSQL Integration** – Reliable relational database for structured data storage, complex queries, and ACID-compliant transactions.
--  **Docker Support** – Fully containerized setup with `Dockerfile` and `docker-compose` for consistent, one-command deployment.
-- **Full CRUD Operations** – Complete Create, Read, Update, and Delete functionality for all resource types.
--  **Input Validation** – Automatic request/response validation powered by Pydantic v2 models.
--  **Auto-Generated API Docs** – Interactive Swagger UI and ReDoc documentation available out of the box.
+- **Docker Support** – Fully containerized setup with `Dockerfile` and `docker-compose` for consistent, one-command deployment.
+- **Full CRUD Operations** – Complete Create, Read, Update, and Delete functionality for posts and users.
+- **Voting System** – Users can upvote or downvote posts, with vote counts tracked per post.
+- **User Authentication** – Secure JWT-based auth so only registered users can post and vote.
+- **Input Validation** – Automatic request/response validation powered by Pydantic v2 models.
+- **Auto-Generated API Docs** – Interactive Swagger UI and ReDoc documentation available out of the box.
 
+---
+
+## 🚀 Live Demo
+
+The API is live and deployed on **Render**. Explore the interactive documentation without any setup:
+
+| | Link |
+|---|---|
+| **Swagger UI** | [https://fastapi-management-system.onrender.com/docs](https://fastapi-management-system.onrender.com/docs) |
+| **ReDoc** | [https://fastapi-management-system.onrender.com/redoc](https://fastapi-management-system.onrender.com/redoc) |
+| **Base URL** | [https://fastapi-management-system.onrender.com](https://fastapi-management-system.onrender.com) |
+
+> ⚠️ **Note:** The service may take **30–60 seconds** to wake up on first load, as it runs on Render's free tier.
 
 ---
 
@@ -23,12 +38,20 @@ A robust and scalable **management system** built with **FastAPI** and powered b
 | **Backend** | FastAPI (Python 3.9+) |
 | **Database** | PostgreSQL 15 |
 | **Validation** | Pydantic v2 |
+| **Authentication** | JWT (python-jose) |
+| **Migrations** | Alembic |
 | **Containerization** | Docker + Docker Compose |
-
+| **Hosting** | Render |
 
 ---
 
+## How It Works
 
+1. **Register** a new account or **log in** to get a JWT access token.
+2. **Create posts** to share content with the community.
+3. **Browse posts** from other users.
+4. **Vote** on posts you like or dislike.
+5. **Manage your posts** — edit or delete anything you've created.
 
 ---
 
@@ -45,13 +68,13 @@ Before you begin, make sure you have the following installed:
 
 ---
 
-###  Installation (Local)
+### Installation (Local)
 
 **1. Clone the repository:**
 
 ```bash
-git clone https://github.com/your-username/FastAPI-Management-System.git
-cd FastAPI-Management-System
+git clone https://github.com/your-username/FastAPI-Social-Platform.git
+cd FastAPI-Social-Platform
 ```
 
 **2. Create and activate a virtual environment:**
@@ -80,7 +103,7 @@ Create a `.env` file in the project root by copying the example:
 cp .env.example .env
 ```
 
-Then update the values in `.env` (this project uses these names):
+Then update the values in `.env`:
 
 ```env
 # Database
@@ -123,8 +146,8 @@ The API will be available at:
 **1. Clone the repository:**
 
 ```bash
-git clone https://github.com/your-username/FastAPI-Management-System.git
-cd FastAPI-Management-System
+git clone https://github.com/your-username/FastAPI-Social-Platform.git
+cd FastAPI-Social-Platform
 ```
 
 **2. Configure your environment:**
@@ -156,30 +179,40 @@ docker-compose down
 
 ---
 
-##  Running Tests
-
-Make sure your virtual environment is active, then run:
-
-Fast Api swegger
-
----
-
 ## 📡 API Endpoints Overview
 
+### 👤 Auth
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/` |  check all the contants |
-| `GET` | `/posts/` | List all posts |
-| `POST` | `/posts/` | Create a new post |
-| `GET` | `/posts/{id}` | Get a single post |
-| `PUT` | `/posts/{id}` | Update a post |
-| `DELETE` | `/posts/{id}` | Delete a post |
+| `POST` | `/login` | Log in and receive a JWT token |
 
-> Full interactive documentation is available at `/docs` when the server is running.
+### 👥 Users
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/users/` | Register a new user |
+| `GET` | `/users/{id}` | Get a user's profile |
+
+### 📝 Posts
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/posts/` | Browse all posts |
+| `POST` | `/posts/` | Share a new post |
+| `GET` | `/posts/{id}` | View a single post |
+| `PUT` | `/posts/{id}` | Edit your post |
+| `DELETE` | `/posts/{id}` | Delete your post |
+
+### 👍 Votes
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/vote/` | Upvote or remove your vote on a post |
+
+> 🔐 Most endpoints require a valid JWT token in the `Authorization: Bearer <token>` header.
+>
+> Full interactive documentation available at [`/docs`](https://fastapi-management-system.onrender.com/docs).
 
 ---
 
-##  Contributing
+## Contributing
 
 Contributions are welcome! To get started:
 
@@ -189,9 +222,7 @@ Contributions are welcome! To get started:
 4. Push to your branch: `git push origin feature/your-feature-name`
 5. Open a Pull Request
 
-
 ---
-
 
 ## 📬 Contact
 
@@ -201,6 +232,5 @@ Have questions or suggestions? Open an issue or reach out via GitHub Discussions
 
 <p align="center">Built with ❤️ using FastAPI & PostgreSQL</p>
 
-
-  ![giphy](https://github.com/user-attachments/assets/f3bb48f1-537c-4323-be64-9c4e02268191)
+![giphy](https://github.com/user-attachments/assets/f3bb48f1-537c-4323-be64-9c4e02268191)
 
