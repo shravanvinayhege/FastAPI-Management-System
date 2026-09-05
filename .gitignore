@@ -9,3 +9,4 @@ venv/
 *.pyo
 *.pyd
 *.log
+media/avatars/*

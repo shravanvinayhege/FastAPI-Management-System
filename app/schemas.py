@@ -1,4 +1,6 @@
-from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, conint
+import json
+
+from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, field_validator, conint
 from datetime import datetime
 from typing import Optional
 
@@ -16,8 +18,15 @@ class PostCreate(PostBase):
 
 class UserOut(BaseModel):  
     id: int
+    username: Optional[str] = None
     email: str
     created_at: datetime
+    display_name: Optional[str] = None
+    bio: Optional[str] = None
+    avatar_url: Optional[str] = None
+    profile_visibility: Optional[str] = None
+    show_posts: Optional[bool] = None
+    show_communities: Optional[bool] = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -25,6 +34,57 @@ class FollowStatus(BaseModel):
     following: bool
     follower_count: int
     following_count: int
+
+
+class ProfileUpdate(BaseModel):
+    display_name: Optional[str] = Field(default=None, max_length=100)
+    bio: Optional[str] = Field(default=None, max_length=1000)
+    profile_visibility: Optional[str] = Field(default=None, pattern="^(public|private)$")
+    show_posts: Optional[bool] = None
+    show_communities: Optional[bool] = None
+
+
+class ProfileUser(BaseModel):
+    id: int
+    username: str
+    display_name: str
+    bio: Optional[str]
+    avatar_url: str
+    created_at: datetime
+
+
+class ProfileStats(BaseModel):
+    followers: int
+    following: int
+    posts: int
+    communities: int
+
+
+class ProfileRelationship(BaseModel):
+    is_following: bool
+    is_followed_by: bool
+
+
+class ProfilePrivacy(BaseModel):
+    visibility: str
+    show_posts: bool
+    show_communities: bool
+
+
+class ProfileResponse(BaseModel):
+    user: ProfileUser
+    stats: ProfileStats
+    relationship: ProfileRelationship
+    privacy: ProfilePrivacy
+
+
+class PublicUser(BaseModel):
+    id: int
+    username: str
+    display_name: str
+    avatar_url: str
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CommunityCreate(BaseModel):
@@ -77,10 +137,21 @@ class NotificationOut(BaseModel):
     type: str
     entity_type: str
     entity_id: Optional[int]
-    payload: str
+    payload: dict[str, object]
     is_read: bool
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("payload", mode="before")
+    @classmethod
+    def parse_payload(cls, value: object) -> dict[str, object]:
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError:
+                return {}
+            return parsed if isinstance(parsed, dict) else {}
+        return value if isinstance(value, dict) else {}
 
 
 class ReplyCreate(BaseModel):
@@ -96,7 +167,14 @@ class ReplyOut(BaseModel):
     content: str
     created_at: datetime
     updated_at: datetime
+    owner: Optional[UserOut] = None
     model_config = ConfigDict(from_attributes=True)
+
+
+class ShareOut(BaseModel):
+    post_id: int
+    shared: bool
+    share_count: int
     
 
 class Post(PostBase):
@@ -114,6 +192,7 @@ class PostOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class UserCreate(BaseModel):
+    username: Optional[str] = Field(default=None, min_length=3, max_length=50, pattern="^[a-zA-Z0-9_]+$")
     email: str
     password: str
 

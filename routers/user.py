@@ -1,10 +1,14 @@
-from fastapi import status, HTTPException, Depends, APIRouter, Query
+import re
+import json
+
+from fastapi import status, HTTPException, Depends, APIRouter, Query, BackgroundTasks
 from app import models, schemas, utility
 from app.database import get_db
 from sqlalchemy import delete, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from routers import oauth2
+from routers.chat import manager
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -18,7 +22,21 @@ def get_all_users(
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=schemas.UserOut)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     hashed_password = utility.hash(user.password)  # cleaner utility call
-    new_user = models.User(**{**user.model_dump(), "password": hashed_password})  # pydantic v2
+    requested_username = user.username or user.email.split("@", 1)[0]
+    username = re.sub(r"[^a-zA-Z0-9_]+", "_", requested_username).strip("_").lower()[:50]
+    if len(username) < 3:
+        username = f"user_{len(user.email)}"
+    base_username = username
+    suffix = 1
+    while db.query(models.User).filter(models.User.username == username).first():
+        suffix += 1
+        username = f"{base_username[:50 - len(str(suffix)) - 1]}_{suffix}"
+    new_user = models.User(
+        username=username,
+        email=user.email,
+        password=hashed_password,
+        display_name=username,
+    )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -34,6 +52,13 @@ def get_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"User with id {id} does not exist")
+    if user.profile_visibility == "private" and current_user.id != user.id:
+        follows = db.query(models.user_follows).filter(
+            models.user_follows.c.follower_id == current_user.id,
+            models.user_follows.c.following_id == user.id,
+        ).first()
+        if follows is None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This profile is private")
     return user
 
 
@@ -83,6 +108,7 @@ def _get_target_user(db: Session, user_id: int) -> models.User:
 @router.post("/{id}/follow", response_model=schemas.FollowStatus)
 def follow_user(
     id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(oauth2.get_current_user),
 ):
@@ -98,6 +124,15 @@ def follow_user(
             follower_id=current_user.id,
             following_id=id,
         ))
+        notification = models.Notification(
+            recipient_id=id,
+            actor_id=current_user.id,
+            type="NEW_FOLLOWER",
+            entity_type="user",
+            entity_id=current_user.id,
+            payload=json.dumps({"follower_id": current_user.id}),
+        )
+        db.add(notification)
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -105,6 +140,11 @@ def follow_user(
             status_code=status.HTTP_409_CONFLICT,
             detail="User is already followed",
         )
+    db.refresh(notification)
+    background_tasks.add_task(manager.send_to_user, id, {
+        "type": "notification",
+        "notification": schemas.NotificationOut.model_validate(notification).model_dump(mode="json"),
+    })
     return _get_follow_status(db, current_user.id, id)
 
 

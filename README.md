@@ -192,6 +192,20 @@ docker-compose down
 | `POST` | `/users/` | Register a new user |
 | `GET` | `/users/{id}` | Get a user's profile |
 
+### 👤 Profiles
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/users/{username}/profile` | View a public or authorized private profile |
+| `PATCH` | `/users/me/profile` | Update your display name, bio, or privacy settings |
+| `POST` | `/users/me/avatar` | Upload a validated PNG, JPEG, or WebP avatar |
+| `DELETE` | `/users/me/avatar` | Reset to the deterministic default avatar |
+| `GET` | `/users/{username}/posts` | List profile posts with pagination |
+| `GET` | `/users/{username}/followers` | List public follower summaries |
+| `GET` | `/users/{username}/following` | List public following summaries |
+| `GET` | `/users/{username}/communities` | List visible community memberships |
+
+Profile migrations backfill usernames from existing email addresses. New users may provide an optional `username`; otherwise it is generated from the email local part.
+
 ### 🏘️ Communities
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -224,6 +238,7 @@ Notifications are available through `/notifications/`, `/notifications/unread-co
 | `GET` | `/posts/{id}/replies` | List paginated replies |
 | `PATCH` | `/posts/replies/{id}` | Edit your reply |
 | `DELETE` | `/posts/replies/{id}` | Delete your reply and its descendants |
+| `POST` | `/posts/{id}/share` | Record one share per authenticated user |
 
 Posts may include optional `image_url` and `video_url` fields in addition to text. Media URLs must be valid HTTP(S) URLs.
 

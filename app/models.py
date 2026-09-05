@@ -27,14 +27,24 @@ class Post(Base):
     owner=relationship("User")
     community = relationship("Community", back_populates="posts")
     replies = relationship("PostReply", back_populates="post", cascade="all, delete-orphan")
+    shares = relationship("PostShare", back_populates="post", cascade="all, delete-orphan")
 
 
 class User(Base):  
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, nullable=False)
+    username = Column(String(50), nullable=False, unique=True, index=True)
     email = Column(String, nullable=False, unique=True)
     password = Column(String, nullable=False)
+    display_name = Column(String(100), nullable=False)
+    bio = Column(String(1000), nullable=True)
+    avatar_url = Column(String(2048), nullable=True)
+    avatar_type = Column(String(20), nullable=False, default="default", server_default="default")
+    profile_visibility = Column(String(20), nullable=False, default="public", server_default="public")
+    show_posts = Column(Boolean, nullable=False, default=True, server_default="true")
+    show_communities = Column(Boolean, nullable=False, default=True, server_default="true")
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('NOW()'))
+    updated_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('NOW()'))
     followers = relationship(
         "User",
         secondary=user_follows,
@@ -155,3 +165,15 @@ class PostReply(Base):
     owner = relationship("User", back_populates="replies")
     parent = relationship("PostReply", remote_side=[id], back_populates="children")
     children = relationship("PostReply", back_populates="parent", cascade="all, delete-orphan")
+
+
+class PostShare(Base):
+    __tablename__ = "post_shares"
+    __table_args__ = (UniqueConstraint("post_id", "user_id", name="uq_post_shares_post_user"),)
+
+    id = Column(Integer, primary_key=True, nullable=False)
+    post_id = Column(Integer, ForeignKey("posts.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("NOW()"), index=True)
+
+    post = relationship("Post", back_populates="shares")

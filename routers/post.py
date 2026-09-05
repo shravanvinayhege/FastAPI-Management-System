@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from routers import oauth2
 from typing import Optional
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 
 router = APIRouter(prefix="/posts", tags=["Posts"])
 
@@ -86,6 +87,28 @@ def get_posts(db: Session = Depends(get_db),
     )
     # db.query(Post, votes) returns tuples, but response_model expects objects
     return [{"Post": post, "votes": votes} for post, votes in results]
+
+
+@router.post("/{post_id}/share", response_model=schemas.ShareOut)
+def share_post(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(oauth2.get_current_user),
+):
+    if db.query(models.Post).filter(models.Post.id == post_id).first() is None:
+        raise HTTPException(status_code=404, detail="Post not found")
+    share = models.PostShare(post_id=post_id, user_id=current_user.id)
+    db.add(share)
+    try:
+        db.commit()
+        shared = True
+    except IntegrityError:
+        db.rollback()
+        shared = False
+    share_count = db.query(func.count(models.PostShare.id)).filter(
+        models.PostShare.post_id == post_id,
+    ).scalar() or 0
+    return schemas.ShareOut(post_id=post_id, shared=shared, share_count=share_count)
 
 
 @router.post("/{post_id}/replies", response_model=schemas.ReplyOut, status_code=status.HTTP_201_CREATED)

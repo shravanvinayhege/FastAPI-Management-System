@@ -1,10 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 from app.config import settings
-from routers import auth, chat, community, notification, post, user, vote
+from routers import auth, chat, community, notification, post, profile, user, vote
 
 app = FastAPI()
+Path("media/avatars").mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory="media"), name="media")
 
 origins = settings.cors_origins_list
 app.add_middleware(
@@ -28,5 +32,6 @@ app.include_router(vote.router)
 app.include_router(community.router)
 app.include_router(chat.router)
 app.include_router(notification.router)
+app.include_router(profile.router)
 
 
