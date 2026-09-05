@@ -100,6 +100,8 @@ class CommunityOut(BaseModel):
     creator_id: int
     created_at: datetime
     updated_at: datetime
+    member_count: int = 0
+    is_member: bool = False
     model_config = ConfigDict(from_attributes=True)
 
 

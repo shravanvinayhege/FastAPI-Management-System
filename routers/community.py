@@ -13,6 +13,17 @@ from routers import oauth2
 router = APIRouter(prefix="/communities", tags=["Communities"])
 
 
+def _optional_current_user(
+    token: Optional[str] = Depends(oauth2.optional_oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> Optional[models.User]:
+    if not token:
+        return None
+    credentials_exception = HTTPException(status_code=401, detail="Not valid credentials")
+    token_data = oauth2.verify_access_token(token, credentials_exception)
+    return db.query(models.User).filter(models.User.id == token_data.id).first()
+
+
 def _slugify(name: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-")
     if not slug:
@@ -32,6 +43,27 @@ def _is_member(db: Session, community_id: int, user_id: int) -> bool:
         models.community_members.c.community_id == community_id,
         models.community_members.c.user_id == user_id,
     ).first() is not None
+
+
+def _community_response(
+    db: Session,
+    community: models.Community,
+    current_user: Optional[models.User] = None,
+) -> schemas.CommunityOut:
+    member_count = db.query(func.count()).select_from(models.community_members).filter(
+        models.community_members.c.community_id == community.id,
+    ).scalar() or 0
+    return schemas.CommunityOut(
+        id=community.id,
+        name=community.name,
+        slug=community.slug,
+        description=community.description,
+        creator_id=community.creator_id,
+        created_at=community.created_at,
+        updated_at=community.updated_at,
+        member_count=member_count,
+        is_member=current_user is not None and _is_member(db, community.id, current_user.id),
+    )
 
 
 @router.post("/", response_model=schemas.CommunityOut, status_code=status.HTTP_201_CREATED)
@@ -68,7 +100,7 @@ def create_community(
         db.rollback()
         raise HTTPException(status_code=409, detail="Community name or slug already exists")
     db.refresh(new_community)
-    return new_community
+    return _community_response(db, new_community, current_user)
 
 
 @router.get("/", response_model=list[schemas.CommunityOut])
@@ -77,16 +109,22 @@ def list_communities(
     limit: int = Query(20, ge=1, le=100),
     search: Optional[str] = Query(None, max_length=100),
     db: Session = Depends(get_db),
+    current_user: Optional[models.User] = Depends(_optional_current_user),
 ):
     query = db.query(models.Community)
     if search:
         query = query.filter(models.Community.name.ilike(f"%{search}%"))
-    return query.order_by(models.Community.created_at.desc(), models.Community.id.desc()).offset(skip).limit(limit).all()
+    communities = query.order_by(models.Community.created_at.desc(), models.Community.id.desc()).offset(skip).limit(limit).all()
+    return [_community_response(db, community, current_user) for community in communities]
 
 
 @router.get("/{community_id}", response_model=schemas.CommunityOut)
-def get_community(community_id: int, db: Session = Depends(get_db)):
-    return _get_community(db, community_id)
+def get_community(
+    community_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[models.User] = Depends(_optional_current_user),
+):
+    return _community_response(db, _get_community(db, community_id), current_user)
 
 
 @router.post("/{community_id}/join", response_model=schemas.CommunityOut)
@@ -104,7 +142,7 @@ def join_community(
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=409, detail="Already a community member")
-    return community
+    return _community_response(db, community, current_user)
 
 
 @router.delete("/{community_id}/join", status_code=status.HTTP_204_NO_CONTENT)
