@@ -37,6 +37,21 @@ def get_user(
     return user
 
 
+@router.get("/me/communities", response_model=list[schemas.CommunityOut])
+def get_my_communities(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(oauth2.get_current_user),
+):
+    return db.query(models.Community).join(
+        models.community_members,
+        models.community_members.c.community_id == models.Community.id,
+    ).filter(
+        models.community_members.c.user_id == current_user.id,
+    ).order_by(models.community_members.c.joined_at.desc()).offset(skip).limit(limit).all()
+
+
 def _get_follow_status(db: Session, current_user_id: int, target_user_id: int) -> schemas.FollowStatus:
     following = db.query(models.user_follows).filter(
         models.user_follows.c.follower_id == current_user_id,

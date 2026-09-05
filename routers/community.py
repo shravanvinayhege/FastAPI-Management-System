@@ -1,0 +1,162 @@
+import re
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app import models, schemas
+from app.database import get_db
+from routers import oauth2
+
+router = APIRouter(prefix="/communities", tags=["Communities"])
+
+
+def _slugify(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-")
+    if not slug:
+        raise HTTPException(status_code=422, detail="Community name must contain letters or numbers")
+    return slug
+
+
+def _get_community(db: Session, community_id: int) -> models.Community:
+    community = db.query(models.Community).filter(models.Community.id == community_id).first()
+    if community is None:
+        raise HTTPException(status_code=404, detail="Community not found")
+    return community
+
+
+def _is_member(db: Session, community_id: int, user_id: int) -> bool:
+    return db.query(models.community_members).filter(
+        models.community_members.c.community_id == community_id,
+        models.community_members.c.user_id == user_id,
+    ).first() is not None
+
+
+@router.post("/", response_model=schemas.CommunityOut, status_code=status.HTTP_201_CREATED)
+def create_community(
+    community: schemas.CommunityCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(oauth2.get_current_user),
+):
+    name = community.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Community name cannot be blank")
+    slug = _slugify(name)
+    duplicate = db.query(models.Community).filter(
+        func.lower(models.Community.name) == name.lower()
+    ).first()
+    if duplicate or db.query(models.Community).filter(models.Community.slug == slug).first():
+        raise HTTPException(status_code=409, detail="Community name or slug already exists")
+
+    new_community = models.Community(
+        name=name,
+        slug=slug,
+        description=community.description.strip(),
+        creator_id=current_user.id,
+    )
+    db.add(new_community)
+    try:
+        db.flush()
+        db.execute(models.community_members.insert().values(
+            user_id=current_user.id,
+            community_id=new_community.id,
+        ))
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Community name or slug already exists")
+    db.refresh(new_community)
+    return new_community
+
+
+@router.get("/", response_model=list[schemas.CommunityOut])
+def list_communities(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    search: Optional[str] = Query(None, max_length=100),
+    db: Session = Depends(get_db),
+):
+    query = db.query(models.Community)
+    if search:
+        query = query.filter(models.Community.name.ilike(f"%{search}%"))
+    return query.order_by(models.Community.created_at.desc(), models.Community.id.desc()).offset(skip).limit(limit).all()
+
+
+@router.get("/{community_id}", response_model=schemas.CommunityOut)
+def get_community(community_id: int, db: Session = Depends(get_db)):
+    return _get_community(db, community_id)
+
+
+@router.post("/{community_id}/join", response_model=schemas.CommunityOut)
+def join_community(
+    community_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(oauth2.get_current_user),
+):
+    community = _get_community(db, community_id)
+    if _is_member(db, community_id, current_user.id):
+        raise HTTPException(status_code=409, detail="Already a community member")
+    try:
+        db.execute(models.community_members.insert().values(user_id=current_user.id, community_id=community_id))
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Already a community member")
+    return community
+
+
+@router.delete("/{community_id}/join", status_code=status.HTTP_204_NO_CONTENT)
+def leave_community(
+    community_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(oauth2.get_current_user),
+):
+    _get_community(db, community_id)
+    result = db.execute(models.community_members.delete().where(
+        models.community_members.c.community_id == community_id,
+        models.community_members.c.user_id == current_user.id,
+    ))
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Membership does not exist")
+    db.commit()
+
+
+@router.get("/{community_id}/members", response_model=list[schemas.UserOut])
+def list_members(
+    community_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    _get_community(db, community_id)
+    return db.query(models.User).join(
+        models.community_members,
+        models.community_members.c.user_id == models.User.id,
+    ).filter(
+        models.community_members.c.community_id == community_id,
+    ).order_by(models.community_members.c.joined_at.asc(), models.User.id.asc()).offset(skip).limit(limit).all()
+
+
+@router.get("/{community_id}/posts", response_model=list[schemas.PostOut])
+def list_community_posts(
+    community_id: int,
+    sort: str = Query("new", pattern="^(new|top|hot)$"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    _get_community(db, community_id)
+    vote_count = func.count(models.Vote.post_id)
+    query = db.query(models.Post, vote_count.label("votes")).outerjoin(
+        models.Vote, models.Vote.post_id == models.Post.id,
+    ).filter(models.Post.community_id == community_id).group_by(models.Post.id)
+    if sort == "top":
+        query = query.order_by(vote_count.desc(), models.Post.created_at.desc(), models.Post.id.desc())
+    elif sort == "hot":
+        query = query.order_by(vote_count.desc(), models.Post.created_at.desc(), models.Post.id.desc())
+    else:
+        query = query.order_by(models.Post.created_at.desc(), models.Post.id.desc())
+    results = query.offset(skip).limit(limit).all()
+    return [{"Post": post, "votes": votes} for post, votes in results]

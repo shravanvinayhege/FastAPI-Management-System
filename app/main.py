@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from routers import auth, post, user, vote
+from routers import auth, chat, community, notification, post, user, vote
 
 app = FastAPI()
 
@@ -25,5 +25,8 @@ app.include_router(post.router)
 app.include_router(user.router)
 app.include_router(auth.router)
 app.include_router(vote.router)
+app.include_router(community.router)
+app.include_router(chat.router)
+app.include_router(notification.router)
 
 

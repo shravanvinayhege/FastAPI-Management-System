@@ -192,6 +192,26 @@ docker-compose down
 | `POST` | `/users/` | Register a new user |
 | `GET` | `/users/{id}` | Get a user's profile |
 
+### 🏘️ Communities
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/communities/` | Create a community |
+| `GET` | `/communities/` | List communities |
+| `POST` | `/communities/{id}/join` | Join a community |
+| `DELETE` | `/communities/{id}/join` | Leave a community |
+| `GET` | `/communities/{id}/posts` | List paginated community posts |
+
+### 💬 Direct Messages and Realtime
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/conversations` | Create or reuse a private conversation |
+| `GET` | `/conversations` | List your conversations |
+| `GET` | `/conversations/{id}/messages` | Get paginated message history |
+| `POST` | `/conversations/{id}/messages` | Send a message |
+| `WS` | `/ws/events?token=<JWT>` | Receive private message and notification events |
+
+Notifications are available through `/notifications/`, `/notifications/unread-count`, and the read endpoints.
+
 ### 📝 Posts
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -200,6 +220,12 @@ docker-compose down
 | `GET` | `/posts/{id}` | View a single post |
 | `PUT` | `/posts/{id}` | Edit your post |
 | `DELETE` | `/posts/{id}` | Delete your post |
+| `POST` | `/posts/{id}/replies` | Add a reply or nested reply |
+| `GET` | `/posts/{id}/replies` | List paginated replies |
+| `PATCH` | `/posts/replies/{id}` | Edit your reply |
+| `DELETE` | `/posts/replies/{id}` | Delete your reply and its descendants |
+
+Posts may include optional `image_url` and `video_url` fields in addition to text. Media URLs must be valid HTTP(S) URLs.
 
 ### 👍 Votes
 | Method | Endpoint | Description |
